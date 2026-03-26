@@ -6,3 +6,4 @@ jaxtyping
 matplotlib
 dataclasses
 networkx
+pytest
