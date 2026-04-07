@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "meteor"
+version = "0.1.0"
+description = "METEOR: Multi-Class Edge Traffic Engineering for Orbital Routing"
+authors = [{ name = "Sam Ghalayini", email = "sghala26@student.aau.dk" }]
+requires-python = ">=3.10"
+readme = "README.md"
+
+dependencies = [
+    "numpy>=1.24",
+    "networkx>=3.0",
+    "scipy>=1.10",
+    "tqdm>=4.60",
+]
+
+[project.optional-dependencies]
+ml = [
+    "torch>=2.0",
+]
+solver = [
+    "cvxpy>=1.4",
+]
+dev = [
+    "pytest>=7.0",
+    "pre-commit>=3.0",
+    "ruff>=0.4",
+]
+all = ["meteor[ml,solver,dev]"]
+
+[tool.setuptools.packages.find]
+include = ["data*", "models*", "solvers*", "utils*"]
+
+# ── Ruff ──────────────────────────────────────
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+]
+ignore = [
+    "E501",   # line too long (let formatter handle it)
+    "B008",   # function call in default argument (common in dataclasses)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["data", "models", "solvers", "utils"]
+
+# ── Pytest ────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v --tb=short"

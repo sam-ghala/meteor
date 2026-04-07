@@ -1,1 +1,29 @@
+# Python
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
 .venv/
+
+# Testing
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data artifacts (large files)
+*.npz
+*.pkl
+*.pt
+*.ckpt
+
+# Jupyter
+.ipynb_checkpoints/
