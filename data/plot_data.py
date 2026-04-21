@@ -26,7 +26,7 @@ from data.traffic import (
 # Config
 # ──────────────────────────────────────────────
 
-FIGDIR = os.path.join("data", "figures")
+FIGDIR = os.path.join("figures")
 os.makedirs(FIGDIR, exist_ok=True)
 
 # Consistent style

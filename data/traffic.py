@@ -4,7 +4,7 @@ Author: Sam Ghalayini
 meteor/data/traffic.py
 """
 
-# imports
+# %% imports
 from dataclasses import dataclass
 
 import numpy as np
@@ -12,7 +12,7 @@ import numpy as np
 from data.constellation import Topology
 
 
-# traffic class properties
+# fixed properties per class
 @dataclass(frozen=True)
 class class_params:
     class_id: int
@@ -25,14 +25,15 @@ class class_params:
 
 CLASS_NAMES = ["voice", "video", "file"]
 CLASS_PARAMS = {
-    0: class_params(0, "voice", d_f=0.064, L_f=640.0, tau=0.050, w=0.5),
-    1: class_params(1, "video", d_f=8.0, L_f=8e6, tau=0.500, w=0.3),
-    2: class_params(2, "file", d_f=50.0, L_f=50e6, tau=10.0, w=0.2),
+    0: class_params(0, "voice", d_f=0.064, L_f=640.0, tau=0.150, w=0.6),  # 0.5 0.3 0.2
+    1: class_params(1, "video", d_f=8.0, L_f=2e6, tau=0.500, w=0.25),
+    2: class_params(2, "file", d_f=50.0, L_f=50e6, tau=10.0, w=0.15),
 }
 
 DEFAULT_CLASS_WEIGHTS = np.array([0.60, 0.25, 0.15])
 DEFAULT_OFFLOAD_PROB = np.array([0.0, 0.05, 0.30])  # voice, video, and file offloading probability
 # precompute lookup arrays of each data type param
+"""vectorized class params for all 10,000 fows at once"""
 _D_F = np.array([CLASS_PARAMS[c].d_f for c in range(3)])
 _L_F = np.array([CLASS_PARAMS[c].L_f for c in range(3)])
 _TAU = np.array([CLASS_PARAMS[c].tau for c in range(3)])
@@ -86,6 +87,7 @@ POPULATION_CENTERS = [
 
 def build_population_weights(topology: Topology) -> np.ndarray:
     """Create probability distribution over satellite IDs based off of population density, determines where traffic originates and terminates from, minimal to no traffic in oceans and deserts or when inclination degree is reached"""
+    # weight satellites over populations stronger than oceans/deseerts but still everything nonzero
     N = topology.N
     weights = np.zeros(N)
     R = topology.config.earth_radius
@@ -121,7 +123,12 @@ def generate_flows(
     offload_prob: np.ndarray = DEFAULT_OFFLOAD_PROB,
     rng: np.random.Generator | None = None,
 ) -> FlowTable:
-    """Sample a cmoplete flow table for one TE interval"""
+    """Sample a cmoplete flow table for one TE interval
+    - class id sampled from weights
+    - sources sampled from pop_weights
+    - offloading is per-flow bernouli trial (voice=0,video=0.05, file=0.30)
+    - dest sources sampled from pop_weights
+    """
     if rng is None:
         rng = np.random.default_rng()
     N = topology.N
@@ -194,7 +201,8 @@ def scale_to_load(
     offload_prob: np.ndarray = DEFAULT_OFFLOAD_PROB,
     rng: np.random.Generator | None = None,
 ) -> FlowTable:
-    """generate flow table whose total demand is a fraction of total network, not completely loading the network"""
+    """generate flow table whose total demand is a fraction of total network, not completely loading the network
+    - how many flows are needed to hit a target congestion level, network capacity is ISL capacities/2"""
     if rng is None:
         rng = np.random.default_rng()
 
@@ -257,3 +265,6 @@ def summarize_flows(flows: FlowTable) -> dict:
         summary["workload_mean"] = 0
 
     return summary
+
+
+# %%

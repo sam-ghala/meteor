@@ -331,8 +331,3 @@ class TestGetFlowPaths:
             fid = int(flows.flow_id[f])
             for path in get_flow_paths(path_data, f):
                 assert path.flow_id == fid
-
-
-# ──────────────────────────────────────────────
-# Run with: python -m pytest tests/test_paths.py -v
-# ──────────────────────────────────────────────

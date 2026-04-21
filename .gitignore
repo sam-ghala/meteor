@@ -27,3 +27,7 @@ Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints/
+
+# prelim figures
+data/data/figures/
+data/figures/
