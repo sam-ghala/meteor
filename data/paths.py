@@ -92,6 +92,7 @@ def compute_comm_paths(
     graph: nx.DiGraph,
     flows: FlowTable,
     k: int = 10,
+    verbose=False,
 ) -> dict[int, list[tuple[list[int], float]]]:
     """
     Compute candidate paths for all communication flows (is_offload == False).
@@ -100,7 +101,7 @@ def compute_comm_paths(
     """
     comm_indices = np.where(~flows.is_offload)[0]
     mapping_flow_dict = {}
-    for i in tqdm(comm_indices, desc="processing comm_paths..."):
+    for i in tqdm(comm_indices, desc="processing comm_paths...", disable=not verbose):
         try:
             mapping_flow_dict[flows.flow_id[i]] = k_shortest_paths(
                 graph, int(flows.src_sat[i]), int(flows.dst_sat[i]), k
@@ -116,6 +117,7 @@ def compute_offload_paths(
     server_sat_ids: list[int],
     k_per_server: int = 3,
     k_total: int = 10,
+    verbose=False,
 ) -> dict[int, list[tuple[list[int], float, int]]]:
     """
     Compute candidate paths for all offloading flows.
@@ -124,7 +126,7 @@ def compute_offload_paths(
     """
     offload_indices = np.where(flows.is_offload)[0]
     mapping_flow_dict = {}
-    for i in tqdm(offload_indices, desc="processing offload_paths..."):
+    for i in tqdm(offload_indices, desc="processing offload_paths...", disable=not verbose):
         candidates = []
         for server_idx, server_sat in enumerate(server_sat_ids):
             # if src == server_sat, add direct path 0 hops
@@ -149,6 +151,7 @@ def build_path_data(
     server_sat_ids: list[int],
     k: int = 10,
     k_per_server: int = 3,
+    verbose=False,
 ) -> PathData:
     """
     Main entry point. Computes all paths and assembles the PathData bundle.
@@ -168,10 +171,12 @@ def build_path_data(
     # build edge index
     edge_to_idx, n_edges = build_edge_index(graph)
     # compute paths for comm flows
-    comm_paths = compute_comm_paths(graph, flows, k)
+    comm_paths = compute_comm_paths(graph, flows, k, verbose=verbose)
 
     # compute paths for offloading flows
-    offload_paths = compute_offload_paths(graph, flows, server_sat_ids, k_per_server, k)
+    offload_paths = compute_offload_paths(
+        graph, flows, server_sat_ids, k_per_server, k, verbose=verbose
+    )
 
     global_idx = 0
     all_paths = []

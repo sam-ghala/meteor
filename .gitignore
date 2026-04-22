@@ -29,5 +29,10 @@ Thumbs.db
 .ipynb_checkpoints/
 
 # prelim figures
-data/data/figures/
-data/figures/
+figures/
+
+# dataset
+labels/
+
+# results
+results/

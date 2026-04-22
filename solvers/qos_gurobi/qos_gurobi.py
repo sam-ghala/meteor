@@ -2,15 +2,7 @@
 File created at: 2026-04-19 18:21:11
 Author: Sam Ghalayini
 meteor/solvers/qos_gurobi/qos_gurobi.py
-
-QoS-aware Gurobi: linearized Problem 1 formulation
-
-Linearization: T_f is approximated as a constant T_approx_f computed at
-(full demand, shortest-path propagation, fastest server). This removes all
-nonlinear terms (division by sumx_fp) at the cost of:
-  - T_approx underestimates true delay (optimistic)
-  - optimizer can't see bandwidth→delay tradeoff directly
-  - compensated by deadline-derived min-bw and bandwidth incentive term
+QoS-aware Gurobi
 """
 
 # %%
@@ -42,8 +34,10 @@ def solve_qos_gurobi(
     C_up = 50.0
     C_dn = 50.0
 
-    model = gp.Model("meteor_qos")
-    model.setParam("OutputFlag", 0)
+    env = gp.Env(empty=True)
+    env.setParam("OutputFlag", 0)
+    env.start()
+    model = gp.Model("meteor_qos", env=env)
     model.setParam("TimeLimit", 120)
 
     # Decision variables
@@ -53,10 +47,7 @@ def solve_qos_gurobi(
     v = model.addMVar(F, lb=0.0, name="v")  # deadline slack
 
     # Precompute T_approx: constant delay estimate per flow
-    #
-    # EXACT:   T_f = L_f/(sum x_fp·1e6) + sum(x_fp·tau_p)/sum(x_fp) + sum(y_fs·W_f/mu_s)
-    #               (transmission time) (propagation time) (compute time)
-    # APPROX:  T_approx = L_f/(d_f·1e6) + min_p(tau_p) + W_f/max(mu_s)
+    # T_approx = L_f/(d_f·1e6) + min_p(tau_p) + W_f/max(mu_s)
     #          (full demand)   (shortest path)   (fastest server)
     T_approx = np.zeros(F)
     for f in range(F):
@@ -191,14 +182,6 @@ def solve_qos_gurobi(
         )
 
     # Objective (linearized)
-    #
-    # EXACT:   min sum_c w_c/(|F^c|·tau_c) · sum [z_f·T_f + (1-z_f)·M_drop] + (lambda)sumv_f
-    #          z_f·T_f is bilinear (binary × variable)
-    #
-    # APPROX:  min sum_c w_c/(|F^c|·tau_c) · sum [z_f·T_approx + (1-z_f)·M_drop]
-    #              - sum bw_weight · x_fp     ← bandwidth incentive (Taylor approx)
-    #              + (lambda)sumv_f
-    #          z_f·T_approx is linear (binary × constant)
     obj = gp.LinExpr()
 
     # Term 1: admission cost
@@ -210,7 +193,9 @@ def solve_qos_gurobi(
         if n_c == 0:
             continue
         scale = config.w_c[c] / (n_c * cp.tau)
-        coeff = (T_approx[f] - config.M_drop) * scale
+        coeff = (
+            T_approx[f] - config.M_drop
+        ) * scale  # negative number, good because we are minimizing
         obj += coeff * z[f]
 
     # Term 2: bandwidth incentive (linearization)
@@ -224,7 +209,10 @@ def solve_qos_gurobi(
         n_c = n_per_class[c]
         if n_c == 0 or flows.d_f[f] < 1e-12:
             continue
-        bw_weight = config.w_c[c] / (n_c * cp.tau) * flows.L_f[f] / (flows.d_f[f] ** 2 * 1e6)
+        bw_weight = (
+            config.w_c[c] / (n_c * cp.tau) * flows.L_f[f] / (flows.d_f[f] ** 2 * 1e6)
+        )  # first order taylor approx f(x) + f'(x) * (a - x), a being full demand/optimistic solution
+        # a in taylor approx is "expected operating point" of the function we want a first order/tangent line for
         start = path_data.flow_path_start[f]
         end = path_data.flow_path_end[f]
         for p in range(start, end):
@@ -251,8 +239,8 @@ def solve_qos_gurobi(
         y_sol = np.zeros((F, S))
         v_sol = np.zeros(F)
 
-    n_offload_admitted = sum(1 for f in range(F) if flows.is_offload[f] and z_sol[f] > 0.5)
-    print(f"  offloading: {n_offload_admitted} / {int(flows.is_offload.sum())} admitted")
+    # n_offload_admitted = sum(1 for f in range(F) if flows.is_offload[f] and z_sol[f] > 0.5)
+    # print(f"  offloading: {n_offload_admitted} / {int(flows.is_offload.sum())} admitted")
 
     solve_time = time.perf_counter() - t0
     return TEresult(x_sol, y_sol, z_sol, v_sol, solve_time)

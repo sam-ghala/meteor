@@ -36,9 +36,11 @@ def solve_gurobi(
     C_up = 50.0
     C_dn = 50.0
 
-    model = gp.Model("meteor_throughput")
-    model.setParam("OutputFlag", 0)
-    model.setParam("TimeLimit", 60)
+    env = gp.Env(empty=True)
+    env.setParam("OutputFlag", 0)
+    env.start()
+    model = gp.Model("meteor_throughput", env=env)
+    model.setParam("TimeLimit", 120)
 
     # variables
     x = model.addMVar(P, lb=0.0, name="x")  # traffic allocation
