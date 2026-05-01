@@ -4,6 +4,11 @@
 *.egg-info/
 dist/
 build/
+__pycache__/
+*.pyc
+.ruff_cache/
+build/
+dist/
 
 # Virtual environment
 .venv/
@@ -39,3 +44,11 @@ results/
 
 # tex paper
 paper/
+
+# old datsets
+old_data/
+
+data/
+
+# basic tests
+tests/
