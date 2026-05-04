@@ -16,85 +16,87 @@ Each experiment runs:
 
 from __future__ import annotations
 
+import datetime as dt
 import json
-import os
-import socket
+import logging
+import shutil
 import subprocess
-import sys
-from datetime import datetime
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
 
-def get_git_sha(short: bool = True) -> str:
+
+def get_git_sha(repo_root: Path | None = None) -> tuple[str, bool]:
     """Return current git SHA"""
+    cwd = repo_root or Path.cwd()
     try:
-        cmd = ["git", "rev-parse", "--short", "HEAD"] if short else ["git", "rev-parse", "HEAD"]
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=2,
+        sha = (
+            subprocess.check_output(
+                ["git", "rev-parse", "HEAD"],
+                cwd=cwd,
+                stderr=subprocess.DEVNULL,
+            )
+            .decode()
+            .strip()
         )
-        return result.stdout.strip()
-    except (subprocess.SubprocessError, FileNotFoundError, OSError):
-        return "nogit"
-
-
-def get_git_dirty() -> bool:
-    """Return True if the working tree has uncommited changes"""
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return "unknown", False
     try:
-        result = subprocess.run(
-            ["git", "status", "--porcelain"], capture_output=True, text=True, check=True, timeout=2
+        status = (
+            subprocess.check_output(
+                ["git", "status", "--porcelain"],
+                cwd=cwd,
+                stderr=subprocess.DEVNULL,
+            )
+            .decode()
+            .strip()
         )
-        return bool(result.stdout.strip())
-    except (subprocess.SubprocessError, FileExistsError, OSError):
-        return False
+        is_dirty = bool(status)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        is_dirty = False
+    return sha, is_dirty
 
 
 def make_output_dir(
+    base: Path,
     experiment_name: str,
-    base_dir: str | Path = "outputs",
+    timestamp: dt.datetime | None = None,
 ) -> Path:
     """Format: {base_dir}/{experiment_name}/{YYYYMMDD}_{git_sha}[runN]/"""
-    base = Path(base_dir) / experiment_name
-    base.mkdir(parents=True, exist_ok=True)
-
-    date_str = datetime.now().strftime("%Y%m%d")
-    sha = get_git_sha()
-    stem = f"{date_str}_{sha}"
-
-    candidate = base / stem
-    if not candidate.exists():
-        candidate.mkdir()
-        return candidate
-    n = 2
-    while True:
-        candidate = base / f"{stem}_run{n}"
-        if not candidate.exists():
-            candidate.mkdir()
-            return candidate
-        n += 1
+    ts = timestamp or dt.datetime.now()
+    name = f"{ts:%Y-%m-%d_%H-%M-%S}"
+    out = base / experiment_name / name
+    out.mkdir(parents=True, exist_ok=True)
+    return out
 
 
-def write_provenance(out_dir: Path, extra: dict | None = None) -> None:
+def write_provenance(
+    out_dir: Path,
+    config_path: Path | None,
+    extra_metadata: dict | None = None,
+    repo_root: Path | None = None,
+) -> Path:
     """Write a reproducible .json with git state, host, timestamp, and command"""
-    record = {
-        "timestamp": datetime.now().isoformat(),
-        "git_sha": get_git_sha(short=False),
-        "git_sha_short": get_git_sha(short=True),
-        "git_dirty": get_git_dirty(),
-        "host": socket.gethostname(),
-        "python_version": sys.version,
-        "command": " ".join(sys.argv),
-        "cwd": os.getcwd(),
+    sha, is_dirty = get_git_sha(repo_root)
+    metadata = {
+        "git_sha": sha,
+        "git_dirty": is_dirty,
+        "timestamp_utc": dt.datetime.utcnow().isoformat() + "Z",
+        "cwd": str(Path.cwd()),
+        "config_path": str(config_path) if config_path else None,
     }
-    if extra:
-        record.update(extra)
-    (out_dir / "provenance.json").write_text(json.dumps(record, indent=2, default=str))
+    if extra_metadata:
+        metadata.update(extra_metadata)
 
+    prov_path = out_dir / "provenance.json"
+    prov_path.write_text(json.dumps(metadata, indent=2))
 
-def write_config_snapshot(out_dir: Path, config_path: Path) -> None:
-    """Copy input conifg into output dir"""
-    text = Path(config_path).read_text()
-    (out_dir / "config.yaml").write_text(text)
+    if config_path is not None and config_path.exists():
+        shutil.copy(config_path, out_dir / "config.yaml")
+
+    if is_dirty:
+        logger.warning(
+            f"Uncomitted changes in git tree, results may not be exactly reproducible, sha: {sha}",
+        )
+
+    return prov_path

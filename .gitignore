@@ -47,8 +47,10 @@ paper/
 
 # old datsets
 old_data/
-
 data/
 
 # basic tests
 tests/
+
+# outputs
+outputs/

@@ -10,171 +10,162 @@ References:
 from __future__ import annotations
 
 from meteor.config.constellation import ConstellationConfig
-from meteor.config.hardware import HW_V3
+from meteor.config.hardware import HW_FOUR_ISL, HW_THREE_ISL, HardwareConfig
 from meteor.config.orbital import ShellConfig
 
-# iridium
-# =======
-IRIDIUM_SHELL = ShellConfig(
-    shell_id="iridium_780",
-    altitude_km=780.0,
-    inclination_deg=86.4,
-    n_planes=6,
-    sats_per_plane=11,
+
+def _shell(
+    shell_id: str,
+    altitude_km: float,
+    inclination_deg: float,
+    n_planes: int,
+    sats_per_plane: int,
+    hardware: HardwareConfig,
+) -> ShellConfig:
+    """Helper to construct a ShellConfig"""  # after refactoring and remaking so many shells this is a nice function to have
+    return ShellConfig(
+        shell_id=shell_id,
+        altitude_km=altitude_km,
+        inclination_deg=inclination_deg,
+        n_planes=n_planes,
+        sats_per_plane=sats_per_plane,
+        hardware=hardware,
+    )
+
+
+# construction functions for all shells
+# =====================================
+
+
+# iridium shells
+def _iridium_shell(hw: HardwareConfig) -> ShellConfig:
+    return _shell("iridium780", 780.0, 86.4, 6, 11, hw)
+
+
+# starlink small for iterations
+def _starlink_s1_8x(hw):
+    return _shell("starlink_s1_550_8x", 550.0, 53.0, 9, 22, hw)
+
+
+def _starlink_s2_8x(hw):
+    return _shell("starlink_s2_540_8x", 540.0, 53.2, 9, 22, hw)
+
+
+# starlink full
+def _starlink_s1(hw: HardwareConfig):
+    return _shell("starlink_s1_550", 550.0, 53.0, 72, 22, hw)
+
+
+def _starlink_s2(hw: HardwareConfig):
+    return _shell("starlink_s2_540", 540.0, 53.2, 72, 22, hw)
+
+
+def _starlink_s3(hw: HardwareConfig):
+    return _shell("starlink_s3_570", 570.0, 70.0, 36, 20, hw)
+
+
+def _starlink_s4(hw: HardwareConfig):
+    return _shell("starlink_s4_560", 560.0, 97.6, 6, 58, hw)
+
+
+# gen2 starlink
+def _gen2_s1(hw: HardwareConfig):
+    return _shell("gen2_s1_525", 525.0, 53.0, 28, 60, hw)
+
+
+def _gen2_s2(hw: HardwareConfig):
+    return _shell("gen2_s2_530", 530.0, 43.0, 28, 60, hw)
+
+
+def _gen2_s3(hw: HardwareConfig):
+    return _shell("gen2_s3_535", 535.0, 33.0, 28, 60, hw)
+
+
+def _gen2_s4(hw: HardwareConfig):
+    return _shell("gen2_s4_345", 345.0, 48.0, 24, 48, hw)
+
+
+def _gen2_s5(hw: HardwareConfig):
+    return _shell("gen2_s5_350", 350.0, 38.0, 24, 48, hw)
+
+
+def _gen2_s6(hw: HardwareConfig):
+    return _shell("gen2_s6_360_polar", 360.0, 96.9, 12, 30, hw)
+
+
+# iridium constellation
+# =====================
+IRIDIUM_FOUR_ISL = ConstellationConfig(
+    shells=(_iridium_shell(HW_FOUR_ISL),),
 )
-IRIDIUM = ConstellationConfig(
-    shells=(IRIDIUM_SHELL,),
+IRIDIUM_THREE_ISL = ConstellationConfig(
+    shells=(_iridium_shell(HW_THREE_ISL),),
 )
 
-# mid-sized constallation (396 satellites)
-# ========================================
-_S1_REDUCED_8X = ShellConfig(
-    shell_id="starlink_s1_550_reduced_8x",
-    altitude_km=550.0,
-    inclination_deg=53.0,
-    n_planes=9,
-    sats_per_plane=22,
+# starlink small constellations
+# =============================
+STARLINK_S1_ONLY_FOUR_ISL = ConstellationConfig(
+    shells=(_starlink_s1(HW_FOUR_ISL),),
+)
+STARLINK_S1_ONLY_THREE_ISL = ConstellationConfig(
+    shells=(_starlink_s1(HW_THREE_ISL),),
 )
 
-_S2_REDUCED_8X = ShellConfig(
-    shell_id="starlink_s2_540_reduced_8x",
-    altitude_km=540.0,
-    inclination_deg=53.2,
-    n_planes=9,
-    sats_per_plane=22,
+STARLINK_TWO_SHELL_FOUR_ISL = ConstellationConfig(
+    shells=(_starlink_s1(HW_FOUR_ISL), _starlink_s2(HW_FOUR_ISL))
 )
-STARLINK_MID_SMALL = ConstellationConfig(
-    shells=(_S1_REDUCED_8X, _S2_REDUCED_8X),
-    ground_access_enabled=True,
+STARLINK_TWO_SHELL_THREE_ISL = ConstellationConfig(
+    shells=(_starlink_s1(HW_THREE_ISL), _starlink_s2(HW_THREE_ISL))
 )
 
-# individual starlink shells
-# ==========================
-STARLINK_S1 = ShellConfig(
-    shell_id="starlink_s1_550",
-    altitude_km=550.0,
-    inclination_deg=53.0,
-    n_planes=72,
-    sats_per_plane=22,
+STARLINK_MID_THREE_ISL = ConstellationConfig(
+    shells=(_starlink_s1_8x(HW_THREE_ISL), _starlink_s2_8x(HW_THREE_ISL))
+)
+STARLINK_MID_FOUR_ISL = ConstellationConfig(
+    shells=(_starlink_s1_8x(HW_FOUR_ISL), _starlink_s2_8x(HW_FOUR_ISL))
 )
 
-STARLINK_S2 = ShellConfig(
-    shell_id="starlink_s2_540",
-    altitude_km=540.0,
-    inclination_deg=53.2,
-    n_planes=72,
-    sats_per_plane=22,
-)
-
-STARLINK_S3 = ShellConfig(
-    shell_id="starlink_s3_570",
-    altitude_km=570.0,
-    inclination_deg=70.0,
-    n_planes=36,
-    sats_per_plane=20,
-)
-
-STARLINK_S4 = ShellConfig(
-    shell_id="starlink_s4_560",
-    altitude_km=560.0,
-    inclination_deg=97.6,
-    n_planes=6,
-    sats_per_plane=58,
-)
-# starlink constallations at different scales
-# ===========================================
-STARLINK_S1_ONLY = ConstellationConfig(
-    shells=(STARLINK_S1,),
-)
-
-STARLINK_TWO_SHELL = ConstellationConfig(
+# starlink full constellation
+# ===========================
+STARLINK_FULL_THREE_ISL = ConstellationConfig(
     shells=(
-        STARLINK_S1,
-        STARLINK_S2,
-    ),
-    cross_shell_lasers_enabled=True,
-    ground_access_enabled=False,
+        _starlink_s1(HW_THREE_ISL),
+        _starlink_s2(HW_THREE_ISL),
+        _starlink_s3(HW_THREE_ISL),
+        _starlink_s4(HW_THREE_ISL),
+    )
 )
-
-STARLINK_FULL = ConstellationConfig(
+STARLINK_FULL_FOUR_ISL = ConstellationConfig(
     shells=(
-        STARLINK_S1,
-        STARLINK_S2,
-        STARLINK_S3,
-        STARLINK_S4,
-    ),
-    cross_shell_lasers_enabled=True,
-    ground_access_enabled=True,
+        _starlink_s1(HW_FOUR_ISL),
+        _starlink_s2(HW_FOUR_ISL),
+        _starlink_s3(HW_FOUR_ISL),
+        _starlink_s4(HW_FOUR_ISL),
+    )
 )
 
-STARLINK_FULL_CROSS_SHELL_LASERS = ConstellationConfig(
-    shells=(STARLINK_S1, STARLINK_S2, STARLINK_S3, STARLINK_S4),
-    cross_shell_lasers_enabled=True,
-    ground_access_enabled=False,
+# gen2 starlink constellation
+# ===========================
+GEN2_S1_ONLY_THREE_ISL = ConstellationConfig(shells=(_gen2_s1(HW_THREE_ISL),))
+GEN2_S1_ONLY_FOUR_ISL = ConstellationConfig(shells=(_gen2_s1(HW_FOUR_ISL),))
+
+GEN2_FULL_THREE_ISL = ConstellationConfig(
+    shells=(
+        _gen2_s1(HW_THREE_ISL),
+        _gen2_s2(HW_THREE_ISL),
+        _gen2_s3(HW_THREE_ISL),
+        _gen2_s4(HW_THREE_ISL),
+        _gen2_s5(HW_THREE_ISL),
+        _gen2_s6(HW_THREE_ISL),
+    )
 )
-
-# GEN2 Constellation, V3 satellites (FCC, January 2026)
-# =====================================================
-GEN2_S1 = ShellConfig(
-    shell_id="gen2_s1_525",
-    altitude_km=525.0,
-    inclination_deg=53.0,
-    n_planes=28,
-    sats_per_plane=60,
-    hardware=HW_V3,
-)
-
-GEN2_S2 = ShellConfig(
-    shell_id="gen2_s2_530",
-    altitude_km=530.0,
-    inclination_deg=43.0,
-    n_planes=28,
-    sats_per_plane=60,
-    hardware=HW_V3,
-)
-
-GEN2_S3 = ShellConfig(
-    shell_id="gen2_s3_535",
-    altitude_km=535.0,
-    inclination_deg=33.0,
-    n_planes=28,
-    sats_per_plane=60,
-    hardware=HW_V3,
-)
-
-GEN2_S4 = ShellConfig(
-    shell_id="gen2_s4_345",
-    altitude_km=345.0,
-    inclination_deg=48.0,
-    n_planes=24,
-    sats_per_plane=48,
-    hardware=HW_V3,
-)
-
-GEN2_S5 = ShellConfig(
-    shell_id="gen2_s5_350",
-    altitude_km=350.0,
-    inclination_deg=38.0,
-    n_planes=24,
-    sats_per_plane=48,
-    hardware=HW_V3,
-)
-
-GEN2_S6_POLAR = ShellConfig(
-    shell_id="gen2_s6_360_polar",
-    altitude_km=360.0,
-    inclination_deg=96.9,
-    n_planes=12,
-    sats_per_plane=30,
-    hardware=HW_V3,
-)
-
-# GEN2 Constellations
-# ===================
-GEN2_S1_ONLY = ConstellationConfig(shells=(GEN2_S1,))
-
-GEN2_FULL = ConstellationConfig(
-    shells=(GEN2_S1, GEN2_S2, GEN2_S3, GEN2_S4, GEN2_S5, GEN2_S6_POLAR),
-    cross_shell_lasers_enabled=True,
-    ground_access_enabled=True,
+GEN2_FULL_FOUR_ISL = ConstellationConfig(
+    shells=(
+        _gen2_s1(HW_FOUR_ISL),
+        _gen2_s2(HW_FOUR_ISL),
+        _gen2_s3(HW_FOUR_ISL),
+        _gen2_s4(HW_FOUR_ISL),
+        _gen2_s5(HW_FOUR_ISL),
+        _gen2_s6(HW_FOUR_ISL),
+    )
 )

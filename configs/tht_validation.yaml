@@ -1,0 +1,12 @@
+# Config for scripts/run_tht_validation.py
+
+# Produces THT statistics and graph
+
+preset: STARLINK_FULL_FOUR_ISL
+
+n_steps: 6000
+dt_s: 0.0125
+
+ground_access_enabled: true
+
+output_dir: outputs

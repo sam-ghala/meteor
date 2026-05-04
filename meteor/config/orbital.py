@@ -9,7 +9,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-from meteor.config.hardware import HW_UNLIMITED, HardwareConfig
+from meteor.config.hardware import HW_FOUR_ISL, HardwareConfig
 
 
 @dataclass(frozen=True)
@@ -57,7 +57,7 @@ class ShellConfig:
     # interlace stallites like brick laying for maximum coverage
 
     lat_cutoff_deg: float = 75.0  # inter-plane links break above this latitude
-    hardware: HardwareConfig = field(default_factory=lambda: HW_UNLIMITED)
+    hardware: HardwareConfig = field(default_factory=lambda: HW_FOUR_ISL)
 
     @property
     def n_satellites(self) -> int:

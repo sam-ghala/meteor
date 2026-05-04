@@ -19,17 +19,14 @@ class ISLThresholds:
     """
     Feasibility thresholds for ISLs
 
-    intra-shell links (inter-plane and intra-plane) links only break on latitudes
+    intra-shell links dont break
+    inter-shell links break at a max threshold distance
     Cross shell ground relay links break when sat-relay elevation angle < 25 degrees
-    Possible to set the inter/intra_plane_max_km to a finite value to enable connection loss based off of distance
     """
 
     # intra-shell distance thresholds
     intra_plane_max_km: float = math.inf
-    inter_plane_max_km: float = math.inf
-
-    # cross-shell laser thresholds (2000km)
-    cross_shell_laser_max_km: float = 2000.0
+    inter_plane_max_km: float = 5016.0  # math.inf
 
     # cross shell ground relay threshold elevation degree
     ground_access_min_elevation_deg: float = 25.0
@@ -43,8 +40,7 @@ class ConstellationConfig:
 
     shells: tuple[ShellConfig, ...]
     isl_thresholds: ISLThresholds = field(default_factory=ISLThresholds)
-    cross_shell_lasers_enabled: bool = True
-    ground_access_enabled: bool = False
+    ground_access_enabled: bool = True
     physics: PhysicalConstants = field(default_factory=lambda: PHYSICS)
 
     def __post_init__(self):
@@ -62,18 +58,6 @@ class ConstellationConfig:
     @property
     def n_satellites(self) -> int:
         return sum(s.n_satellites for s in self.shells)
-
-    @property
-    def cross_shell_enabled(self) -> bool:
-        """is any form of cross-shell connectivity active"""
-        if self.n_shells <= 1:
-            return False
-        return self.cross_shell_lasers_enabled or self.ground_access_enabled
-
-    @property
-    def is_terminal_limited(self) -> bool:
-        """True iff any shell enforces terminal counts (heuristic for pairing must run)"""
-        return any(not s.hardware.is_unlimited for s in self.shells)
 
     # global node id mapping for satllites
     @property

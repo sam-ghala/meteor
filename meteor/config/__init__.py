@@ -5,29 +5,25 @@ meteor/meteor/config/__init__.py
 """
 
 from meteor.config.constellation import ConstellationConfig, ISLThresholds
-from meteor.config.hardware import HW_UNLIMITED, HW_V1_5, HW_V3, UNLIMITED_TERMINALS, HardwareConfig
+from meteor.config.hardware import HW_FOUR_ISL, HW_THREE_ISL, HardwareConfig, TopologyRule
 from meteor.config.orbital import PHYSICS, PhysicalConstants, ShellConfig
 from meteor.config.presets import (
-    GEN2_FULL,
-    GEN2_S1,
-    GEN2_S1_ONLY,
-    GEN2_S2,
-    GEN2_S3,
-    GEN2_S4,
-    GEN2_S5,
-    GEN2_S6_POLAR,
-    IRIDIUM,
-    IRIDIUM_SHELL,
-    STARLINK_FULL,
-    STARLINK_FULL_CROSS_SHELL_LASERS,
-    STARLINK_MID_SMALL,
-    STARLINK_S1,
-    STARLINK_S1_ONLY,
-    STARLINK_S2,
-    STARLINK_S3,
-    STARLINK_S4,
-    STARLINK_TWO_SHELL,
+    GEN2_FULL_FOUR_ISL,
+    GEN2_FULL_THREE_ISL,
+    GEN2_S1_ONLY_FOUR_ISL,
+    GEN2_S1_ONLY_THREE_ISL,
+    IRIDIUM_FOUR_ISL,
+    IRIDIUM_THREE_ISL,
+    STARLINK_FULL_FOUR_ISL,
+    STARLINK_FULL_THREE_ISL,
+    STARLINK_MID_FOUR_ISL,
+    STARLINK_MID_THREE_ISL,
+    STARLINK_S1_ONLY_FOUR_ISL,
+    STARLINK_S1_ONLY_THREE_ISL,
+    STARLINK_TWO_SHELL_FOUR_ISL,
+    STARLINK_TWO_SHELL_THREE_ISL,
 )
+from meteor.config.registry import get_preset
 
 __all__ = [
     # core configs
@@ -36,33 +32,26 @@ __all__ = [
     "ISLThresholds",
     "PhysicalConstants",
     "PHYSICS",
-    "UNLIMITED_TERMINALS",
+    "TopologyRule",
     "HardwareConfig",
-    # starlink shells
-    "STARLINK_S1",
-    "STARLINK_S2",
-    "STARLINK_S3",
-    "STARLINK_S4",
+    "get_preset",
+    "HW_FOUR_ISL",
+    "HW_THREE_ISL",
     # starlink constellations
-    "STARLINK_S1_ONLY",
-    "STARLINK_TWO_SHELL",
-    "STARLINK_FULL",
-    "STARLINK_FULL_CROSS_SHELL_LASERS",
-    "STARLINK_MID_SMALL",
+    "STARLINK_S1_ONLY_FOUR_ISL",
+    "STARLINK_S1_ONLY_THREE_ISL",
+    "STARLINK_TWO_SHELL_FOUR_ISL",
+    "STARLINK_TWO_SHELL_THREE_ISL",
+    "STARLINK_FULL_FOUR_ISL",
+    "STARLINK_FULL_THREE_ISL",
+    "STARLINK_MID_FOUR_ISL",
+    "STARLINK_MID_THREE_ISL",
     # iridium
-    "IRIDIUM_SHELL",
-    "IRIDIUM",
+    "IRIDIUM_FOUR_ISL",
+    "IRIDIUM_THREE_ISL",
     # Starlink GEN2
-    "GEN2_S1",
-    "GEN2_S2",
-    "GEN2_S3",
-    "GEN2_S4",
-    "GEN2_S5",
-    "GEN2_S6_POLAR",
-    "GEN2_S1_ONLY",
-    "GEN2_FULL",
-    # hardware
-    "HW_UNLIMITED",
-    "HW_V1_5",
-    "HW_V3",
+    "GEN2_S1_ONLY_FOUR_ISL",
+    "GEN2_S1_ONLY_THREE_ISL",
+    "GEN2_FULL_FOUR_ISL",
+    "GEN2_FULL_THREE_ISL",
 ]

@@ -1,0 +1,24 @@
+# config for scripts/run_tht_comparision.py
+
+# compares tht disribution across all constellation sizes and configurations
+
+# total time will take ~sum(c in constellations)(n_steps * topology_build_time(c))
+# roughly equal to 3-60min on a modern laptop
+
+presets:
+  - IRIDIUM_FOUR_ISL
+  - IRIDIUM_THREE_ISL
+  - STARLINK_S1_ONLY_FOUR_ISL
+  - STARLINK_S1_ONLY_THREE_ISL
+  - STARLINK_FULL_FOUR_ISL
+  - STARLINK_FULL_THREE_ISL
+  - GEN2_S1_ONLY_FOUR_ISL
+  - GEN2_S1_ONLY_THREE_ISL
+  - GEN2_FULL_FOUR_ISL
+  - GEN2_FULL_THREE_ISL
+
+n_steps: 10000
+dt_s: 0.0125
+
+ground_access_enabled: true
+output_dir: outputs

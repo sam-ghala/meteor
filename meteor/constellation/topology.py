@@ -6,14 +6,13 @@ meteor/meteor/constellation/topology.py
 Topology snapshot at a single time t
 
 Construction sequence:
-1. Bulid intra-plane edges per shell
-2. Build candidate inter-plane edges per shell
-3. Build candidate cross-shell edges
-4. Prune for hardware limits
-5. Build ground-access edges (use RF, not laser terminals)
-6. Mirror all surviving edges for bidirectional flows
+1. compute satellite ECI positions
+2. build intra-plane connections
+3. build inter-plane connections (3isl or 4isl)
+4. build sat- gateway connections
+5. mirror all for bidirectionality
 
-Note: Bent-pipe relays are distingused in path computation
+Note: removed cross shell links, bent-pipe relays are distingused in path computation
 """
 
 from __future__ import annotations
@@ -25,11 +24,7 @@ import numpy as np
 
 from meteor.config.constellation import ConstellationConfig
 from meteor.constellation import isl as isl_mod
-from meteor.constellation.isl import (
-    ISLType,
-    apply_terminal_budget,
-    build_flexible_budget_array,
-)
+from meteor.constellation.isl import ISLType
 from meteor.constellation.kinematics import constellations_positions, pairwise_distance
 from meteor.ground.gateways import Gateway, gateway_position_array, get_global_gateways
 
@@ -95,10 +90,14 @@ class Topology:
     # construct topology
     @classmethod
     def from_config(
-        cls, config: ConstellationConfig, t: float, gateways: list[Gateway] | None = None
+        cls,
+        config: ConstellationConfig,
+        *,
+        t: float,
+        gateways: list[Gateway] | None = None,
     ) -> Topology:
         logger.debug(
-            f"Building topology at t={t} for {config.n_satellites} satellites across {config.n_shells}, terminal limited={config.is_terminal_limited}"
+            f"Building topology at t={t} for {config.n_satellites} satellites across {config.n_shells}"
         )
 
         # 1. positions
@@ -115,62 +114,22 @@ class Topology:
         # 3. intra-plane
         intra_edges = _build_intra_plane_edges(config, sat_xyz)
 
-        # 4. inter-plane and cross shells
-        inter_candidates = _build_inter_plane_candidates(config, sat_xyz, sat_lats)
-        cross_candidates = _build_cross_shell_candidates(config, sat_xyz)
+        # 4. inter-plane
+        inter_edges = _build_inter_plane_edges(config, sat_xyz, sat_lats)
 
-        # 5. pruning for terminal budgets
-        flex_edges = _combine_candidate_arrays(inter_candidates, cross_candidates)
-        if config.is_terminal_limited and len(flex_edges[0]) > 0:
-            budget = build_flexible_budget_array(config)
-            accepted = apply_terminal_budget(
-                candidate_src=flex_edges[0],
-                candidate_dst=flex_edges[1],
-                candidate_dist=flex_edges[5],
-                candidate_type=flex_edges[4],
-                flexible_budget=budget,
-            )
-            flex_edges = tuple(arr[accepted] for arr in flex_edges)
-            logger.debug(
-                f"Terminal heuristics: kept {int(accepted.sum())} / {len(accepted)} flexible terminals"
-            )
-
-        # 6. ground access edges
-        flex_src, flex_dst, flex_delay, flex_cap, flex_type, _flex_dist = flex_edges
-
-        # 7. mirror to make bidirectional
+        # 5. mirror to make bidirectional
         if config.ground_access_enabled and len(gw_list) > 0:
             ga_edges = _build_ground_access_edges(config, sat_xyz, gw_xyz_arr, gw_list)
         else:
             ga_edges = _empty_edge_tuple()
 
         # make "El Topo" not the movie, the Topology
-        all_groups = [intra_edges, (flex_src, flex_dst, flex_delay, flex_cap, flex_type), ga_edges]
-        src_unidir = (
-            np.concatenate([g[0] for g in all_groups])
-            if any(len(g[0]) for g in all_groups)
-            else np.empty(0, dtype=np.int64)
-        )
-        dst_unidir = (
-            np.concatenate([g[1] for g in all_groups])
-            if any(len(g[1]) for g in all_groups)
-            else np.empty(0, dtype=np.int64)
-        )
-        delay_unidir = (
-            np.concatenate([g[2] for g in all_groups])
-            if any(len(g[2]) for g in all_groups)
-            else np.empty(0)
-        )
-        cap_unidir = (
-            np.concatenate([g[3] for g in all_groups])
-            if any(len(g[3]) for g in all_groups)
-            else np.empty(0)
-        )
-        type_unidir = (
-            np.concatenate([g[4] for g in all_groups])
-            if any(len(g[4]) for g in all_groups)
-            else np.empty(0, dtype=np.int8)
-        )
+        all_groups = [intra_edges, inter_edges, ga_edges]
+        src_unidir = _safe_concat([g[0] for g in all_groups], dtype=np.int64)
+        dst_unidir = _safe_concat([g[1] for g in all_groups], dtype=np.int64)
+        delay_unidir = _safe_concat([g[2] for g in all_groups], dtype=np.float64)
+        cap_unidir = _safe_concat([g[3] for g in all_groups], dtype=np.float64)
+        type_unidir = _safe_concat([g[4] for g in all_groups], dtype=np.int8)
 
         edge_src = np.concatenate([src_unidir, dst_unidir])
         edge_dst = np.concatenate([dst_unidir, src_unidir])
@@ -258,6 +217,7 @@ class Topology:
 
 
 def _empty_edge_tuple():
+    """5 tuple (src, dst, delay, cap, type)"""
     return (
         np.empty(0, dtype=np.int64),
         np.empty(0, dtype=np.int64),
@@ -267,8 +227,11 @@ def _empty_edge_tuple():
     )
 
 
-def _empty_candidate_tuple():
-    return _empty_edge_tuple() + (np.empty(0, dtype=np.float64),)
+def _safe_concat(arrays: list[np.ndarray], dtype) -> np.ndarray:
+    nonempty = [a for a in arrays if len(a) > 0]
+    if not nonempty:
+        return np.empty(0, dtype=dtype)
+    return np.concatenate(nonempty)
 
 
 def _build_shell_idx(config: ConstellationConfig) -> np.ndarray:
@@ -310,123 +273,57 @@ def _build_intra_plane_edges(config: ConstellationConfig, sat_xyz: np.ndarray):
     )
 
 
-def _build_inter_plane_candidates(
+def _build_inter_plane_edges(
     config: ConstellationConfig,
     sat_xyz: np.ndarray,
     sat_lats: np.ndarray,
 ):
     """inter-plane candidates per shell"""
     speed = config.physics.speed_of_light_km_s
-    src_chunks, dst_chunks, delay_chunks, cap_chunks, type_chunks, dist_chunks = (
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-    )
+    src_chunks, dst_chunks, delay_chunks, cap_chunks, type_chunks = [], [], [], [], []
     offsets = config.shell_offsets
 
     for i, shell in enumerate(config.shells):
-        shell_start = offsets[i]
-        shell_end = offsets[i + 1]
+        shell_start = int(offsets[i])
+        shell_end = int(offsets[i + 1])
+        shell_xyz = sat_xyz[shell_start:shell_end]
         shell_lats = sat_lats[shell_start:shell_end]
 
-        local_pairs = isl_mod.inter_plane_pairs(
-            shell, shell_lats, config.isl_thresholds, distances=None
+        local_pairs, dist = isl_mod.inter_plane_pairs(
+            shell,
+            shell_xyz,
+            shell_lats,
+            config.isl_thresholds,
+            topology_rule=shell.hardware.topology_rule,
         )
         if len(local_pairs) == 0:
             continue
         src = local_pairs[:, 0] + shell_start
         dst = local_pairs[:, 1] + shell_start
-        dist = pairwise_distance(sat_xyz[src], sat_xyz[dst])
+        # dist = pairwise_distance(sat_xyz[src], sat_xyz[dst])
 
         src_chunks.append(src)
         dst_chunks.append(dst)
         delay_chunks.append(dist / speed)
         cap_chunks.append(np.full(len(src), shell.hardware.isl_capacity_mbps))
         type_chunks.append(np.full(len(src), int(ISLType.INTER_PLANE), dtype=np.int8))
-        dist_chunks.append(dist)
 
     if not src_chunks:
-        return _empty_candidate_tuple()
+        return _empty_edge_tuple()
     return (
         np.concatenate(src_chunks),
         np.concatenate(dst_chunks),
         np.concatenate(delay_chunks),
         np.concatenate(cap_chunks),
         np.concatenate(type_chunks),
-        np.concatenate(dist_chunks),
     )
-
-
-def _build_cross_shell_candidates(config: ConstellationConfig, sat_xyz: np.ndarray):
-    """Cross-shell laser candidates"""
-    if not (config.cross_shell_enabled and config.n_shells > 1):
-        return _empty_candidate_tuple()
-
-    speed = config.physics.speed_of_light_km_s
-    offsets = config.shell_offsets
-    src_chunks, dst_chunks, delay_chunks, cap_chunks, type_chunks, dist_chunks = (
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-    )
-
-    for i in range(config.n_shells):
-        for j in range(i + 1, config.n_shells):
-            shell_i = config.shells[i]
-            shell_j = config.shells[j]
-            xyz_i = sat_xyz[offsets[i] : offsets[i + 1]]
-            xyz_j = sat_xyz[offsets[j] : offsets[j + 1]]
-            link_cap = min(shell_i.hardware.isl_capacity_mbps, shell_j.hardware.isl_capacity_mbps)
-
-            local_a, local_b = isl_mod.cross_shell_laser_pairs(
-                xyz_i,
-                xyz_j,
-                config.isl_thresholds,
-            )
-            if len(local_a) == 0:
-                continue
-            src = local_a + offsets[i]
-            dst = local_b + offsets[j]
-            dist = pairwise_distance(sat_xyz[src], sat_xyz[dst])
-
-            src_chunks.append(src)
-            dst_chunks.append(dst)
-            delay_chunks.append(dist / speed)
-            cap_chunks.append(np.full(len(src), link_cap))
-            type_chunks.append(np.full(len(src), int(ISLType.CROSS_SHELL_LASER), dtype=np.int8))
-            dist_chunks.append(dist)
-
-    if not src_chunks:
-        return _empty_candidate_tuple()
-    return (
-        np.concatenate(src_chunks),
-        np.concatenate(dst_chunks),
-        np.concatenate(delay_chunks),
-        np.concatenate(cap_chunks),
-        np.concatenate(type_chunks),
-        np.concatenate(dist_chunks),
-    )
-
-
-def _combine_candidate_arrays(*candidate_tuples):
-    """stack multiple candidate-edge tuples into a single one before pruning"""
-    parts = [t for t in candidate_tuples if len(t[0]) > 0]
-    if not parts:
-        return _empty_candidate_tuple()
-    return tuple(np.concatenate([p[k] for p in parts]) for k in range(6))
 
 
 def _build_ground_access_edges(
     config: ConstellationConfig,
     sat_xyz: np.ndarray,
     gw_xyz: np.ndarray,
-    gw_list: list,
+    gw_list: list[Gateway],
 ):
     """sat to gateway edges (seperate connection from ISLs, these use RF (Ka-Band and others))"""
     sat_idx, gw_idx, distances = isl_mod.ground_access_pairs(sat_xyz, gw_xyz, config.isl_thresholds)
@@ -438,8 +335,11 @@ def _build_ground_access_edges(
     n_sats = config.n_satellites
     gw_global = gw_idx + n_sats
 
+    # per edge capacity (min (sat uplink, gateway uplink))
+    shell_idx_arr = _build_shell_idx(config)
+
     sat_uplinks = np.array(
-        [config.shells[_lookup_shell(config, int(s))].hardware.ground_uplink_mbps for s in sat_idx]
+        [config.shells[shell_idx_arr[s]].hardware.ground_uplink_mbps for s in sat_idx]
     )
     gw_uplinks = np.array([gw_list[g].uplink_mbps for g in gw_idx])
     capacity = np.minimum(sat_uplinks, gw_uplinks)
@@ -452,8 +352,3 @@ def _build_ground_access_edges(
         capacity,
         types,
     )
-
-
-def _lookup_shell(config: ConstellationConfig, sat_global_id: int) -> int:
-    offsets = config.shell_offsets
-    return int(np.searchsorted(offsets[1:], sat_global_id, side="right"))
